@@ -37,6 +37,14 @@ DISTANCE_TYPES = {"running", "walking", "hiking", "cycling", "snowboarding", "do
 # Foot-based types that also report pace.
 PACE_TYPES = {"running", "walking", "hiking"}
 
+# Per-sample workout series surfaced on the detail endpoint beyond the HR trace.
+# Each becomes a spec time series plus derived average_/max_ scalars.
+# (stored series_name, spec field, display_name, output unit)
+_DETAIL_SERIES = [
+    ("cyclingPower", "power", "Power", "W"),
+    ("cyclingCadence", "cadence", "Cadence", "rpm"),
+]
+
 
 def _slug(name: str) -> str:
     """Lowercase, spaces to underscores. Mirrored by the SQL filter below."""
@@ -370,9 +378,11 @@ async def service_get_workouts(request: Request) -> dict:
     return {"count": len(workouts), "data": workouts}
 
 
-def _build_workout(r, s, hr_samples=None, route_gpx=None) -> dict:
-    """Build a workout dict from a row and its scalars. Pass hr_samples and
-    route_gpx to include the full per-sample detail (used by the detail endpoint)."""
+def _build_workout(r, s, hr_samples=None, route_gpx=None, detail_series=None) -> dict:
+    """Build a workout dict from a row and its scalars. Pass hr_samples,
+    route_gpx and detail_series to include the full per-sample detail (used by
+    the detail endpoint). detail_series maps a stored series_name to a list of
+    (timestamp, qty) points."""
     wid, name = r[0], r[1]
     wtype = _workout_type(name)
     w = {
@@ -391,6 +401,20 @@ def _build_workout(r, s, hr_samples=None, route_gpx=None) -> dict:
             "metric_id": "heart_rate", "display_name": "Heart Rate",
             "unit": "bpm", "source": SOURCE, "samples": hr_samples,
         }
+
+    # Per-sample series (cycling power, cadence): emit the trace plus avg/max.
+    for series_name, field, display, unit in _DETAIL_SERIES:
+        points = (detail_series or {}).get(series_name)
+        samples = [{"timestamp": d, "value": q} for d, q in (points or []) if q is not None]
+        if not samples:
+            continue
+        w[field] = {
+            "metric_id": field, "display_name": display,
+            "unit": unit, "source": SOURCE, "samples": samples,
+        }
+        values = [sm["value"] for sm in samples]
+        w[f"average_{field}"] = _scalar(f"average_{field}", f"Avg {display}", unit, sum(values) / len(values))
+        w[f"max_{field}"] = _scalar(f"max_{field}", f"Max {display}", unit, max(values))
 
     _emit_scalars(w, _BASE_SCALARS, s)
     distance_m = None
@@ -438,10 +462,21 @@ async def service_get_workout(workout_id: str) -> Response:
         )).fetchall()
         hr_samples = [{"timestamp": date, "value": avg} for date, avg in hrows]
 
+        series_names = [name for name, _, _, _ in _DETAIL_SERIES]
+        placeholders = ",".join("?" * len(series_names))
+        tsrows = await (await conn.execute(
+            f"""SELECT series_name, date, qty FROM workout_time_series
+                WHERE workout_id = ? AND series_name IN ({placeholders}) ORDER BY date""",
+            (workout_id, *series_names),
+        )).fetchall()
+        detail_series: dict[str, list] = {}
+        for series_name, date, qty in tsrows:
+            detail_series.setdefault(series_name, []).append((date, qty))
+
         rrow = await (await conn.execute(
             "SELECT gpx_gzip FROM workout_routes WHERE workout_id = ?",
             (workout_id,),
         )).fetchone()
         route_gpx = gzip.decompress(rrow[0]).decode() if rrow else None
 
-    return Response(content=_build_workout(row, scalars, hr_samples or None, route_gpx))
+    return Response(content=_build_workout(row, scalars, hr_samples or None, route_gpx, detail_series))

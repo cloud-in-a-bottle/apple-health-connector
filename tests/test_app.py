@@ -233,6 +233,57 @@ def test_service_workout_detail_404(stack):
     assert r.status_code == 404
 
 
+def test_cycling_power_and_cadence(stack):
+    """A ride's power-meter + cadence traces survive ingest and are served,
+    with derived average/max scalars, on the detail endpoint only."""
+    payload = {
+        "data": {
+            "workouts": [
+                {
+                    "id": "test-ride-001",
+                    "name": "Outdoor Cycling",
+                    "start": "2025-02-01T07:00:00-05:00",
+                    "end": "2025-02-01T07:30:00-05:00",
+                    "duration": 1800,
+                    "activeEnergyBurned": {"qty": 300, "units": "kcal"},
+                    "cyclingPower": [
+                        {"date": "2025-02-01T07:00:01-05:00", "qty": 100, "units": "W", "source": "Bluetooth Device"},
+                        {"date": "2025-02-01T07:00:02-05:00", "qty": 200, "units": "W", "source": "Bluetooth Device"},
+                        {"date": "2025-02-01T07:00:03-05:00", "qty": 300, "units": "W", "source": "Bluetooth Device"},
+                    ],
+                    "cyclingCadence": [
+                        {"date": "2025-02-01T07:00:01-05:00", "qty": 80, "units": "count/min", "source": "Bluetooth Device"},
+                        {"date": "2025-02-01T07:00:02-05:00", "qty": 90, "units": "count/min", "source": "Bluetooth Device"},
+                    ],
+                }
+            ]
+        }
+    }
+    r = httpx.post(f"{stack.url}/api/data", json=payload, headers={"api-key": _api_key(stack)})
+    assert r.status_code == 200
+    assert r.json()["workouts"]["success"] is True
+
+    detail = httpx.get(f"{stack.url}/api/v1/workouts/test-ride-001").json()
+    assert detail["workout_type"] == "cycling"
+
+    # Power trace + derived scalars.
+    assert [s["value"] for s in detail["power"]["samples"]] == [100, 200, 300]
+    assert detail["power"]["unit"] == "W"
+    assert detail["average_power"]["value"] == 200
+    assert detail["max_power"]["value"] == 300
+    # Cadence trace + derived scalars (count/min surfaced as rpm).
+    assert [s["value"] for s in detail["cadence"]["samples"]] == [80, 90]
+    assert detail["cadence"]["unit"] == "rpm"
+    assert detail["average_cadence"]["value"] == 85
+    assert detail["max_cadence"]["value"] == 90
+
+    # The list endpoint stays a summary: no per-sample power/cadence trace.
+    listed = httpx.get(f"{stack.url}/api/v1/workouts?workout_type=cycling").json()["data"]
+    ride = next(w for w in listed if w["id"] == "test-ride-001")
+    assert "power" not in ride
+    assert "cadence" not in ride
+
+
 def test_service_sleep_sessions(stack):
     r = httpx.get(f"{stack.url}/api/v1/sleep-sessions")
     assert r.status_code == 200
