@@ -1,16 +1,16 @@
 # Apple Health Connector
 
 A self-hosted dashboard for your [Apple Health](https://www.apple.com/ios/health/)
-data on OpenHost. It ingests the metrics and workouts your iPhone and Apple
+data on Cloud in a Bottle. It ingests the metrics and workouts your iPhone and Apple
 Watch collect — heart rate, sleep, activity, and per-workout GPS routes — stores
 them in a private SQLite database on your own zone, and charts them in a web
-dashboard. It also re-exposes that data to other OpenHost apps through the
+dashboard. It also re-exposes that data to other Cloud in a Bottle apps through the
 [health-data service spec](https://github.com/imbue-openhost/health-data-service-spec),
 so anything else you run (fitness trackers, AI assistants, etc.) can read your
 health history without touching Apple's cloud.
 
 **Who it's for:** anyone who wants to own and explore their Apple Health data
-off of Apple's servers, and OpenHost users who want a single health-data source
+off of Apple's servers, and Cloud in a Bottle users who want a single health-data source
 their other apps can build on.
 
 ## How your data gets in
