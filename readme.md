@@ -52,3 +52,7 @@ that make this painless with large histories:
 - Apple Health — https://www.apple.com/ios/health/
 - Health Auto Export (ingest tool) — https://www.healthyapps.dev/apps/health-auto-export/
 - Health data service spec — https://github.com/imbue-openhost/health-data-service-spec
+
+## License
+
+The original Apple Health Connector application and its Cloud in a Bottle packaging are licensed under the [MIT License](LICENSE). Third-party dependencies retain their own licenses.
