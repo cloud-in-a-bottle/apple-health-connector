@@ -11,6 +11,7 @@ from litestar.response import Response
 from . import db
 from .ingest import ingest_payload
 from .manual_import import process_import
+from .service_access import PermissionRequired, guard_service_calls, permission_required_handler
 from .service import (
     service_list_metrics,
     service_get_time_series,
@@ -255,6 +256,8 @@ app = Litestar(
         service_list_metrics, service_get_time_series,
         service_get_sleep_sessions, service_get_workouts, service_get_workout,
     ],
+    guards=[guard_service_calls],
+    exception_handlers={PermissionRequired: permission_required_handler},
     on_startup=[on_startup],
     request_max_body_size=100 * 1024 * 1024,
 )
