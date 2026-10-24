@@ -8,7 +8,7 @@ import httpx
 
 def _api_key(stack) -> str:
     """The app generates the write token on first boot; read it back via settings."""
-    return httpx.get(f"{stack.url}/api/v1/settings").json()["api_key"]
+    return stack.owner_session.get(f"{stack.url}/api/v1/settings").json()["api_key"]
 
 
 def _export_payload(workout_id: str = "manual-1") -> dict:
@@ -79,7 +79,7 @@ def test_health(stack):
 
 
 def test_index_serves_html(stack):
-    r = httpx.get(f"{stack.url}/")
+    r = stack.owner_session.get(f"{stack.url}/")
     assert r.status_code == 200
     assert "Apple Health" in r.text
 
@@ -90,7 +90,7 @@ def test_ingest_requires_auth(stack):
 
 
 def test_settings(stack):
-    r = httpx.get(f"{stack.url}/api/v1/settings")
+    r = stack.owner_session.get(f"{stack.url}/api/v1/settings")
     assert r.status_code == 200
     body = r.json()
     assert body["api_key"].startswith("sk-hae-")
@@ -130,21 +130,21 @@ def test_ingest_metrics(stack):
 
 
 def test_query_heart_rate(stack):
-    r = httpx.get(f"{stack.url}/api/v1/heart-rate")
+    r = stack.owner_session.get(f"{stack.url}/api/v1/heart-rate")
     assert r.status_code == 200
     body = r.json()
     assert body["count"] >= 2
 
 
 def test_service_time_series(stack):
-    r = httpx.get(f"{stack.url}/api/v1/time-series?metric=heart_rate")
+    r = stack.owner_session.get(f"{stack.url}/api/v1/time-series?metric=heart_rate")
     assert r.status_code == 200
     body = r.json()
     assert body["metric_id"] == "heart_rate"
     assert body["unit"] == "bpm"
     assert len(body["samples"]) >= 2
 
-    r2 = httpx.get(f"{stack.url}/api/v1/time-series?metric=active_energy")
+    r2 = stack.owner_session.get(f"{stack.url}/api/v1/time-series?metric=active_energy")
     assert r2.status_code == 200
     body2 = r2.json()
     assert body2["metric_id"] == "active_energy"
@@ -152,7 +152,7 @@ def test_service_time_series(stack):
 
 
 def test_service_list_metrics(stack):
-    r = httpx.get(f"{stack.url}/api/v1/metrics")
+    r = stack.owner_session.get(f"{stack.url}/api/v1/metrics")
     assert r.status_code == 200
     metrics = r.json()["metrics"]
     assert len(metrics) >= 2
@@ -165,7 +165,7 @@ def test_service_list_metrics(stack):
 
 
 def test_stats(stack):
-    r = httpx.get(f"{stack.url}/api/v1/stats")
+    r = stack.owner_session.get(f"{stack.url}/api/v1/stats")
     assert r.status_code == 200
     body = r.json()
     assert body["heart_rate_samples"] >= 2
@@ -201,7 +201,7 @@ def test_ingest_workouts(stack):
 
 
 def test_service_workouts(stack):
-    r = httpx.get(f"{stack.url}/api/v1/workouts")
+    r = stack.owner_session.get(f"{stack.url}/api/v1/workouts")
     assert r.status_code == 200
     body = r.json()
     assert body["count"] >= 1
@@ -219,7 +219,7 @@ def test_service_workouts(stack):
 
 
 def test_service_workout_detail(stack):
-    r = httpx.get(f"{stack.url}/api/v1/workouts/test-workout-001")
+    r = stack.owner_session.get(f"{stack.url}/api/v1/workouts/test-workout-001")
     assert r.status_code == 200
     w = r.json()
     assert w["id"] == "test-workout-001"
@@ -229,7 +229,7 @@ def test_service_workout_detail(stack):
 
 
 def test_service_workout_detail_404(stack):
-    r = httpx.get(f"{stack.url}/api/v1/workouts/does-not-exist")
+    r = stack.owner_session.get(f"{stack.url}/api/v1/workouts/does-not-exist")
     assert r.status_code == 404
 
 
@@ -263,7 +263,7 @@ def test_cycling_power_and_cadence(stack):
     assert r.status_code == 200
     assert r.json()["workouts"]["success"] is True
 
-    detail = httpx.get(f"{stack.url}/api/v1/workouts/test-ride-001").json()
+    detail = stack.owner_session.get(f"{stack.url}/api/v1/workouts/test-ride-001").json()
     assert detail["workout_type"] == "cycling"
 
     # Power trace + derived scalars.
@@ -278,23 +278,23 @@ def test_cycling_power_and_cadence(stack):
     assert detail["max_cadence"]["value"] == 90
 
     # The list endpoint stays a summary: no per-sample power/cadence trace.
-    listed = httpx.get(f"{stack.url}/api/v1/workouts?workout_type=cycling").json()["data"]
+    listed = stack.owner_session.get(f"{stack.url}/api/v1/workouts?workout_type=cycling").json()["data"]
     ride = next(w for w in listed if w["id"] == "test-ride-001")
     assert "power" not in ride
     assert "cadence" not in ride
 
 
 def test_service_sleep_sessions(stack):
-    r = httpx.get(f"{stack.url}/api/v1/sleep-sessions")
+    r = stack.owner_session.get(f"{stack.url}/api/v1/sleep-sessions")
     assert r.status_code == 200
     body = r.json()
     assert "data" in body
 
 
 def test_manual_import(stack):
-    r = httpx.post(
+    r = stack.owner_session.post(
         f"{stack.url}/api/import",
-        content=_export_zip(),
+        data=_export_zip(),
         headers={"x-filename": "export.zip"},
     )
     assert r.status_code == 202
@@ -302,7 +302,7 @@ def test_manual_import(stack):
 
     status = {}
     for _ in range(100):
-        status = httpx.get(f"{stack.url}/api/import/{job_id}").json()
+        status = stack.owner_session.get(f"{stack.url}/api/import/{job_id}").json()
         if status["status"] in ("done", "error"):
             break
         time.sleep(0.2)
@@ -310,13 +310,13 @@ def test_manual_import(stack):
     assert status["processed_workouts"] == 1
 
     # Route was regenerated as GPX and is downloadable.
-    g = httpx.get(f"{stack.url}/workouts/manual-1/route.gpx")
+    g = stack.owner_session.get(f"{stack.url}/workouts/manual-1/route.gpx")
     assert g.status_code == 200
     assert g.headers["content-type"].startswith("application/gpx+xml")
     assert g.text.count("<trkpt") == 2
 
     # Enriched workout is exposed via the service, in spec form/units.
-    data = httpx.get(f"{stack.url}/api/v1/workouts").json()["data"]
+    data = stack.owner_session.get(f"{stack.url}/api/v1/workouts").json()["data"]
     w = next(x for x in data if x["id"] == "manual-1")
     assert w["workout_type"] == "running"
     assert "metrics" not in w
@@ -330,28 +330,28 @@ def test_manual_import(stack):
 
 def test_manual_import_reimport_is_idempotent(stack):
     """Re-importing the same workout replaces rather than duplicates child rows."""
-    before = httpx.get(f"{stack.url}/workouts/manual-1/route.gpx").text.count("<trkpt")
-    r = httpx.post(
+    before = stack.owner_session.get(f"{stack.url}/workouts/manual-1/route.gpx").text.count("<trkpt")
+    r = stack.owner_session.post(
         f"{stack.url}/api/import",
-        content=_export_zip(),
+        data=_export_zip(),
     )
     assert r.status_code == 202
     job_id = r.json()["job_id"]
     for _ in range(100):
-        status = httpx.get(f"{stack.url}/api/import/{job_id}").json()
+        status = stack.owner_session.get(f"{stack.url}/api/import/{job_id}").json()
         if status["status"] in ("done", "error"):
             break
         time.sleep(0.2)
     assert status["status"] == "done", status
-    after = httpx.get(f"{stack.url}/workouts/manual-1/route.gpx").text.count("<trkpt")
+    after = stack.owner_session.get(f"{stack.url}/workouts/manual-1/route.gpx").text.count("<trkpt")
     assert after == before == 2
 
 
 def test_manual_import_plain_json(stack):
     """A plain .json export (no zip wrapper) is accepted too, route and all."""
-    r = httpx.post(
+    r = stack.owner_session.post(
         f"{stack.url}/api/import",
-        content=_export_json("manual-json-1"),
+        data=_export_json("manual-json-1"),
         headers={"x-filename": "export.json"},
     )
     assert r.status_code == 202
@@ -359,14 +359,14 @@ def test_manual_import_plain_json(stack):
 
     status = {}
     for _ in range(100):
-        status = httpx.get(f"{stack.url}/api/import/{job_id}").json()
+        status = stack.owner_session.get(f"{stack.url}/api/import/{job_id}").json()
         if status["status"] in ("done", "error"):
             break
         time.sleep(0.2)
     assert status["status"] == "done", status
     assert status["processed_workouts"] == 1
 
-    g = httpx.get(f"{stack.url}/workouts/manual-json-1/route.gpx")
+    g = stack.owner_session.get(f"{stack.url}/workouts/manual-json-1/route.gpx")
     assert g.status_code == 200
     assert g.text.count("<trkpt") == 2
 
@@ -392,11 +392,11 @@ def test_workouts_ordered_and_filtered_by_instant_not_string(stack):
     assert r.status_code == 200
 
     # Full list is ascending by instant, so tz-late (later instant) comes after tz-early.
-    ids = [w["id"] for w in httpx.get(f"{stack.url}/api/v1/workouts?limit=5000").json()["data"]]
+    ids = [w["id"] for w in stack.owner_session.get(f"{stack.url}/api/v1/workouts?limit=5000").json()["data"]]
     assert ids.index("tz-late") > ids.index("tz-early")
 
     # A UTC `start` window between the two instants includes only tz-late.
-    window = httpx.get(f"{stack.url}/api/v1/workouts?limit=5000&start=2026-04-03T04:00:00Z").json()["data"]
+    window = stack.owner_session.get(f"{stack.url}/api/v1/workouts?limit=5000&start=2026-04-03T04:00:00Z").json()["data"]
     window_ids = {w["id"] for w in window}
     assert "tz-late" in window_ids
     assert "tz-early" not in window_ids
