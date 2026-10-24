@@ -19,7 +19,7 @@ packages = ["openhost_apple_health/src/openhost_apple_health"]
 
 [dependency-groups]
 dev = [
-    "openhost-test-harness @ git+https://github.com/imbue-openhost/openhost-app-test-harness@main",
+    "openhost[test-harness] @ git+https://github.com/cloud-in-a-bottle/cloud-in-a-bottle@main",
     "pytest>=8.0",
     "httpx>=0.27",
 ]
