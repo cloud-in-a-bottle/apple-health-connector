@@ -47,6 +47,10 @@ that make this painless with large histories:
   isn't actually compressed and the GPX files are redundant with the JSON route
   data.
 
+## Which apps can read your data
+
+Other apps read this data through the health-data service, and only with the service's `read` grant, which you approve when you install them (or when they ask). Service calls can only reach the service's endpoints, not this app's own settings or import API.
+
 ## Links
 
 - Apple Health — https://www.apple.com/ios/health/

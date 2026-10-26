@@ -12,6 +12,7 @@ from litestar import Request, get
 from litestar.response import Response
 
 from . import db
+from .service_access import SERVICE_ENDPOINT
 
 log = logging.getLogger(__name__)
 
@@ -90,7 +91,7 @@ def _f_to_c(qty: float, units: str | None = None) -> float:
     return (qty - 32.0) * 5.0 / 9.0
 
 
-@get("/api/v1/metrics")
+@get("/api/v1/metrics", opt=SERVICE_ENDPOINT)
 async def service_list_metrics() -> dict:
     metrics = []
 
@@ -135,7 +136,7 @@ async def service_list_metrics() -> dict:
     return {"metrics": metrics}
 
 
-@get("/api/v1/time-series")
+@get("/api/v1/time-series", opt=SERVICE_ENDPOINT)
 async def service_get_time_series(request: Request) -> dict:
     metric = request.query_params.get("metric")
     start = request.query_params.get("start")
@@ -212,7 +213,7 @@ async def _quantity_time_series(metric, start, end, limit) -> dict:
     }
 
 
-@get("/api/v1/sleep-sessions")
+@get("/api/v1/sleep-sessions", opt=SERVICE_ENDPOINT)
 async def service_get_sleep_sessions(request: Request) -> dict:
     start = request.query_params.get("start")
     end = request.query_params.get("end")
@@ -324,7 +325,7 @@ def _emit_scalars(w, fields, s):
     return distance_m
 
 
-@get("/api/v1/workouts")
+@get("/api/v1/workouts", opt=SERVICE_ENDPOINT)
 async def service_get_workouts(request: Request) -> dict:
     workout_type = request.query_params.get("workout_type")
     start = request.query_params.get("start")
@@ -436,7 +437,7 @@ def _build_workout(r, s, hr_samples=None, route_gpx=None, detail_series=None) ->
     return w
 
 
-@get("/api/v1/workouts/{workout_id:str}")
+@get("/api/v1/workouts/{workout_id:str}", opt=SERVICE_ENDPOINT)
 async def service_get_workout(workout_id: str) -> Response:
     """One workout's full detail: scalar metrics plus the heart-rate trace and
     GPS route that the list endpoint omits."""
