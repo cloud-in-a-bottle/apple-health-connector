@@ -51,6 +51,10 @@ that make this painless with large histories:
 
 Other apps read this data through the health-data service, and only with the service's `read` grant, which you approve when you install them (or when they ask). Service calls can only reach the service's endpoints, not this app's own settings or import API.
 
+## Building from source
+
+`cloudinabottle.toml` sets `prebuilt_image`, so Cloud in a Bottle pulls our signed prebuilt image (built by CI from each release tag) instead of building the Dockerfile. To fork and modify this app, comment out `prebuilt_image` so your instance builds from source.
+
 ## Links
 
 - Apple Health — https://www.apple.com/ios/health/
