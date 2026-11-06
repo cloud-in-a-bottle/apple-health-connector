@@ -1,10 +1,13 @@
 [app]
 name = "apple-health"
-version = "0.1.0"
+version = "1.0.0"
 description = "Ingests Apple Health data from Health Auto Export and provides a dashboard"
 
 [runtime.container]
 image = "Dockerfile"
+# Cloud in a Bottle pulls this signed prebuilt image (built from the release tag's commit by CI) instead of building
+# `image`. If you fork this app and change it, comment this line out so your instance builds `image` instead.
+prebuilt_image = "registry.cloudinabottle.org/apple-health-connector"
 port = 8080
 
 [routing]
