@@ -1,6 +1,7 @@
 [app]
 name = "apple-health"
-version = "1.0.0"
+version = "1.0.1"
+release_tag_format = "semver"
 description = "Ingests Apple Health data from Health Auto Export and provides a dashboard"
 
 [runtime.container]
